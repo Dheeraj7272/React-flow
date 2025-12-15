@@ -16,8 +16,8 @@ import {
   useEdges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { AnnotationNode } from "@/app/components/AnnotaionNode";
-import WavyEdge from "../components/WavyEdge";
+import { AnnotationNode } from "@/components/AnnotaionNode";
+import WavyEdge from "../../components/WavyEdge";
 import { TextUpdaterNode } from "./TextUpdatedNode";
 import { Button } from "@/components/ui/button";
 import { CustomNode } from "./CustomNode";

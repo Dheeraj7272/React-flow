@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+
+import { loadStripe } from "@stripe/stripe-js";
 import "../globals.css";
 
 
@@ -10,7 +10,7 @@ export default function RootLayout({
 }>) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-san">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-whitesm:items-start">
+      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between px-16 bg-whitesm:items-start">
         {children}
       </main>
     </div>
