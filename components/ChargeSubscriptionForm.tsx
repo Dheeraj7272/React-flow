@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import axios, { AxiosError } from "axios";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Spinner } from "./ui/spinner";
 import {
@@ -26,12 +26,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
+import { ComboboxDemo } from "@/app/stripe-integration/customer-combobox";
+import { useFetch } from "@/app/hooks/useFetch";
+import { getCustomersList } from "@/app/stripe-integration/page";
 
-const create_customer = (data: { email: string; name: string }) =>
-  axios.post(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/customer", data);
-export function CreateCustomerForm({
-  ...props
-}){
+const create_subscription = (data: { email: string; name: string }) =>
+  axios.post(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/subscription", data);
+export function ChargeSubscriptionForm({ ...props }) {
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
@@ -39,22 +40,30 @@ export function CreateCustomerForm({
     name: "",
     email: "",
   });
-  const [open, setOpen] = useState(false)
-  const createCustomerMutation = useMutation(create_customer, {
+  const { data, error, loading, refetch } = useFetch(getCustomersList, {});
+  const customerList = data
+    ? (data as unknown as { email: string; id: string }[])?.map((customer) => ({
+        label: customer.email,
+        value: customer.id,
+      }))
+    : [];
+  const [value, setValue] = useState("");
+  const [open, setOpen] = useState(false);
+  const createSubscriptionMutation = useMutation(create_subscription, {
     onSuccess: () => {
       toast.success("Customer created successfully");
       setFormData({ name: "", email: "" });
       setOpen(false);
-      props?.refetch()
+      props?.refetch();
     },
     onError: () => {
       toast.error("Something went wrong while creating customer");
     },
   });
-  const onCreateCustomer = async (e: FormEvent<HTMLFormElement>) => {
+  const onCreateSubscription = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      createCustomerMutation.mutate(formData);
+      createSubscriptionMutation.mutate(formData);
     } catch (e: any) {
       console.log(e);
       toast.error((e as AxiosError).message);
@@ -64,32 +73,27 @@ export function CreateCustomerForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add Customer</Button>
+        <Button>Create Subscription</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Customer</DialogTitle>
+          <DialogTitle>Create Subscription for user</DialogTitle>
           <DialogDescription>
             Enter your information below to create your account
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onCreateCustomer}>
+        <form onSubmit={onCreateSubscription}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="name">Full Name</FieldLabel>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                type="text"
-                placeholder="John Doe"
-                required
+              <FieldLabel htmlFor="name">Select Customer</FieldLabel>
+              <ComboboxDemo
+                value={value}
+                setValue={setValue}
+                data={customerList}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <FieldLabel htmlFor="email">Enter Customer Email</FieldLabel>
               <Input
                 id="email"
                 type="email"
@@ -101,15 +105,17 @@ export function CreateCustomerForm({
                 required
               />
               <FieldDescription>
-                We&apos;ll use this to contact you. We will not share your email
-                with anyone else.
+                Create subscription for Specific User
               </FieldDescription>
             </Field>
             <FieldGroup>
               <Field>
-                <Button disabled={createCustomerMutation.loading} type="submit">
-                  {createCustomerMutation.loading && <Spinner />}Create Stripe
-                  Customer Account
+                <Button
+                  disabled={createSubscriptionMutation.loading}
+                  type="submit"
+                >
+                  {createSubscriptionMutation.loading && <Spinner />}
+                  Create Subscription
                 </Button>
               </Field>
             </FieldGroup>
