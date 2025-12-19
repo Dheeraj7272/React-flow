@@ -1,13 +1,13 @@
 import { useMutation } from "@/app/hooks/useMutation";
 import { Button } from "@/components/ui/button";
-import { PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+  PaymentElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import axios, { AxiosError } from "axios";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Spinner } from "./ui/spinner";
 import {
@@ -24,14 +24,15 @@ import {
   getCustomersList,
   getProductsList,
 } from "@/app/stripe-integration/page";
-import {Elements} from "@stripe/react-stripe-js"
+import { Elements } from "@stripe/react-stripe-js";
 import { ProductComboboxDemo } from "@/app/stripe-integration/product-combobox";
 import { stripePromise } from "@/lib/stripe";
+import { ProductInfo } from "@/app/stripe-integration/pricing-info";
 
-const create_subscription = (data: { email: string; name: string }) =>
-  axios.post(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/subscription", data);
+const create_order = (data: { customer_id: string; price_ids: string[] }) =>
+  axios.post(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/order", data);
 
-export function ChargeSubscriptionForm({ ...props }) {
+export function CreateOrderForm({ ...props }) {
   const { data: customersData, loading: cLoading } = useFetch(
     getCustomersList,
     {}
@@ -40,7 +41,7 @@ export function ChargeSubscriptionForm({ ...props }) {
     getProductsList,
     {}
   );
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const customerList = customersData
     ? (customersData as unknown as { email: string; id: string }[])?.map(
         (customer) => ({
@@ -49,13 +50,14 @@ export function ChargeSubscriptionForm({ ...props }) {
         })
       )
     : [];
+
   const productList = productsData
-    ? (
-        productsData as unknown as { name: string; default_price: any }[]
-      )?.map((p) => ({
-        label: p.name,
-        value: p.default_price.id,
-      }))
+    ? (productsData as unknown as { name: string; default_price: any }[])
+        ?.filter((p) => p.default_price?.type != "recurring")
+        .map((p) => ({
+          label: p.name,
+          value: p.default_price.id,
+        }))
     : [];
   const [customerInputSearchValue, setCustomerInputSearchValue] = useState("");
   const [productInputSearchValue, setProductInputSearchValue] = useState<
@@ -63,28 +65,46 @@ export function ChargeSubscriptionForm({ ...props }) {
   >([]);
 
   const [open, setOpen] = useState(false);
-  const createSubscriptionMutation = useMutation(create_subscription, {
+  const createOrderMutation = useMutation(create_order, {
     onSuccess: (data) => {
-      toast.success("Subscription created successfully");
+      toast.success(data?.message || "Subscription created successfully");
       // setOpen(false);
       // props?.refetch();
-      if(data.client_secret){
+      if (data.client_secret) {
         setClientSecret(data.client_secret);
       }
       console.log(data);
     },
     onError: (e) => {
       console.log(e);
-      toast.error(e?.response?.data?.detail || "Something went wrong while creating customer");
+      toast.error(
+        e?.response?.data?.detail ||
+          "Something went wrong while creating customer"
+      );
     },
   });
+  const selectectedProducts = productsData?.filter((p) =>
+    productInputSearchValue?.includes(p.default_price.id)
+  );
+  const totalOrderPrice =
+    selectectedProducts && selectectedProducts.length
+      ? {
+          amount: selectectedProducts?.reduce(
+            (accumulator, currentValue) =>
+              accumulator + currentValue.default_price.unit_amount,
+            0
+          ),
+          currency: selectectedProducts?.[0]?.default_price?.currency,
+        }
+      : undefined;
   const onCreateSubscription = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const itemsList = productInputSearchValue.map((p) => ({ price: p }));
-      createSubscriptionMutation.mutate({
-        customer: customerInputSearchValue,
-        items: itemsList,
+      createOrderMutation.mutate({
+        customer_id: customerInputSearchValue,
+        products: productsData?.filter((p) =>
+          productInputSearchValue?.includes(p.default_price.id)
+        ),
       });
     } catch (e: any) {
       console.log(e);
@@ -92,17 +112,17 @@ export function ChargeSubscriptionForm({ ...props }) {
     }
   };
 
+  useEffect(() => {}, [productInputSearchValue]);
+
   return (
     <Dialog open={open} modal onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Create Subscription</Button>
+        <Button>Create Order for the customer</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Subscription for user</DialogTitle>
-          <DialogDescription>
-            Enter your information below to create your account
-          </DialogDescription>
+          <DialogTitle>Create Orders</DialogTitle>
+          <DialogDescription>Select Product informations</DialogDescription>
         </DialogHeader>
         <form onSubmit={onCreateSubscription}>
           <FieldGroup>
@@ -119,7 +139,7 @@ export function ChargeSubscriptionForm({ ...props }) {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="name">Select Product</FieldLabel>
+              <FieldLabel htmlFor="name">Select Products</FieldLabel>
               <ProductComboboxDemo
                 loading={pLoading}
                 notFoundLabel="Product not found"
@@ -130,74 +150,64 @@ export function ChargeSubscriptionForm({ ...props }) {
                 data={productList}
               />
             </Field>
+            <ProductInfo totalPrice={totalOrderPrice} />
             <FieldGroup>
               <Field>
                 <Button
                   disabled={
-                    createSubscriptionMutation.loading ||
+                    createOrderMutation.loading ||
                     productInputSearchValue.length == 0 ||
                     customerInputSearchValue.length == 0
                   }
                   type="submit"
                 >
-                  {createSubscriptionMutation.loading && <Spinner />}
-                  Create Subscription
+                  {createOrderMutation.loading && <Spinner />}
+                  Create Order
                 </Button>
               </Field>
             </FieldGroup>
           </FieldGroup>
         </form>
-         {/* Payment UI appears AFTER backend responds */}
-      {clientSecret && (
-        <Elements
-          stripe={stripePromise}
-          options={{ clientSecret }}
-        >
-          <PaymentSection />
-        </Elements>
-      )}
+        {/* Payment UI appears AFTER backend responds */}
+        {clientSecret && (
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentSection />
+          </Elements>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
-
-
 function PaymentSection() {
   return (
     <div className="mt-6 border rounded-lg p-4">
-      <h3 className="text-lg font-medium mb-2">
-        Payment Details
-      </h3>
+      <h3 className="text-lg font-medium mb-2">Payment Details</h3>
 
       <PaymentForm />
     </div>
-  )
+  );
 }
 
-
-
 function PaymentForm() {
-  const stripe = useStripe()
-  const elements = useElements()
+  const stripe = useStripe();
+  const elements = useElements();
 
   async function handleConfirm() {
-    if (!stripe || !elements) return
+    if (!stripe || !elements) return;
 
     await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/billing/success`,
       },
-    })
+    });
   }
 
   return (
     <>
       <PaymentElement />
-      <Button onClick={handleConfirm}>
-        Subscribe
-      </Button>
+      <Button onClick={handleConfirm}>Subscribe</Button>
     </>
-  )
+  );
 }

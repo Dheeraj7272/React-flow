@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { CreateCustomerForm } from "@/components/CreateCustomerForm";
 import { ChargeSubscriptionForm } from "@/components/ChargeSubscriptionForm";
+import { CreateOrderForm } from "@/components/CreateOrderForm";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
@@ -73,6 +74,7 @@ export function DataTable<TData, TValue>({
           className="max-w-sm"
         />
         <ChargeSubscriptionForm />
+        <CreateOrderForm/>
         <CreateCustomerForm refetch={refetch} />
       </div>
       <div className="overflow-hidden rounded-md border">

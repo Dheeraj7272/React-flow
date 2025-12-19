@@ -7,19 +7,21 @@ import { useFetch } from "../hooks/useFetch";
 import axios from "axios";
 import { getColumns } from "./columns";
 import { useMutation } from "../hooks/useMutation";
-const stripe = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY as string);
-console.log(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY);
 
 export const getCustomersList = (params) =>
   axios.get(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/customer", {
     params,
   });
 
+export const getProductsList = (params) =>
+  axios.get(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/product", {
+    params,
+  });
 const deleteCustomer = (id) =>
-  axios.delete(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/customer",{
-    params:{
-      id
-    }
+  axios.delete(process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/customer", {
+    params: {
+      id,
+    },
   });
 export default function Page() {
   const { data, error, loading, refetch } = useFetch(getCustomersList, {});
@@ -36,21 +38,6 @@ export default function Page() {
       }),
     [deleteCustomerMutation]
   );
-  // useEffect(() => {
-  //   const getClientData = async () => {
-  //     const clientSecret = await fetch(
-  //       process.env.NEXT_PUBLIC_BACKEND_ENDPOINT + "/payments/create-intent",
-  //       { method: "POST" }
-  //     )
-  //       .then((response) => response.json())
-  //       .then((json) => {
-  //         console.log(json);
-  //         return json.client_secret;
-  //       });
-  //     setClientSecret(clientSecret);
-  //   };
-  //   getClientData();
-  // }, []);
   useEffect(() => {
     console.log(data);
   }, [data]);
